@@ -1,9 +1,6 @@
 #include "EspressoMachine.h"
 #include <ArduinoJson.h>
 
-#define MS_TO_S(x)              ((x) / 1000.0F)
-#define MS_TO_DS(x)             ((x) / 100.0F)
-#define GRAMS_TO_MILLIGRAMS(x)  ((x) * 1000.0F)
 #define WITHIN(A, MIN, MAX)     ((A >= MIN) && (A <= MAX))
 
 enum GeneralCommands {
@@ -53,8 +50,6 @@ void processCmdPayload(const uint8_t* const payload, unsigned int length)
         Serial.print("Invalid command payload\n");
         return;
     }
-
-    Serial.printf("HERE: %d\n", payloadVal);
 
     switch (payloadVal)
     {
@@ -126,22 +121,8 @@ void EspressoMachine::commandsCallback(char* p_topic, uint8_t* p_message, unsign
 void EspressoMachine::begin()
 {
     m_brewTimer.pause();
-    m_infoTimer.pause(); // TODO: Move info and sensorVal timer to inside cloud stream
     m_cloudStream1.begin();
     m_pumpController1.beginController();
-}
-
-void EspressoMachine::packageSensorData(JsonDocument& jsonDoc)
-{
-    jsonDoc["w"] = lroundf(GRAMS_TO_MILLIGRAMS(m_pumpController1.getWeight()));
-    jsonDoc["p"] = lroundf(456.5F);
-    jsonDoc["tm"] = "323";
-    jsonDoc["ti"] = lroundf(MS_TO_DS(m_brewTimer.getCount()));
-}
-
-void EspressoMachine::packageInfoData(JsonDocument& jsonDoc)
-{
-
 }
 
 void EspressoMachine::processCommandRequests()
@@ -171,14 +152,15 @@ void EspressoMachine::processCommandRequests()
 
 void EspressoMachine::runMachine1kHz()
 {
+    // Run pump controller for regulated pressure and weight
     m_pumpController1.runController();
 
-    StaticJsonDocument<150> sensorDoc;
-    StaticJsonDocument<150> infoDoc;
-    packageSensorData(sensorDoc);  // TODO: Move packagaing to inside cloud stream to avoid doing unnecessary computation
-    packageInfoData(infoDoc);
-    m_cloudStream1.runCloudStream(sensorDoc, infoDoc);
+    // Run the brew shot length timer
+    m_brewTimer.updateAndCheckTimer();
 
-    m_brewTimer.updateTimer();
+    // Run module to publish machine data to server
+    m_cloudStream1.runCloudStream();
+
+    // Act upon any received commands
     processCommandRequests();
 }

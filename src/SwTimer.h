@@ -16,12 +16,12 @@ class SwDownTimer
         SwDownTimer() : SwDownTimer(0U, 0U) {}
         ~SwDownTimer() {}
 
-        uint32_t getCount()
+        uint32_t getCount() const
         {
             return m_timerCount;
         }
 
-        bool isExpired()
+        bool isExpired() const
         {
             return (m_timerCount == 0U);
         }
@@ -47,12 +47,12 @@ class SwDownTimer
             m_timerPause = false;
         }
 
-        bool updateTimer()
+        bool updateAndCheckTimer()
         {
-            return updateTimer(m_timeStepLength);
+            return updateAndCheckTimer(m_timeStepLength);
         }
 
-        bool updateTimer(uint32_t timeStepLength)
+        bool updateAndCheckTimer(uint32_t timeStepLength)
         {
             if (!m_timerPause)
             {
@@ -92,12 +92,12 @@ class SwUpTimer
         SwUpTimer() : SwUpTimer(0U, 0U) {}
         ~SwUpTimer() {}
 
-        uint32_t getCount()
+        uint32_t getCount() const
         {
             return m_timerCount;
         }
 
-        bool isExpired()
+        bool isExpired() const
         {
             return (m_timerCount == m_timerLength);
         }
@@ -128,12 +128,12 @@ class SwUpTimer
             m_timerLength = timerLength;
         }
 
-        bool updateTimer()
+        bool updateAndCheckTimer()
         {
-            return updateTimer(m_timeStepLength);
+            return updateAndCheckTimer(m_timeStepLength);
         }
 
-        bool updateTimer(uint32_t timeStepLength)
+        bool updateAndCheckTimer(uint32_t timeStepLength)
         {
             if (!m_timerPause)
             {

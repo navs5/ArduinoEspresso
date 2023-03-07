@@ -1,6 +1,9 @@
 #include "CloudStream.h"
 #include "Credentials.h"
 
+#define MS_TO_S(x)              ((x) / 1000.0F)
+#define MS_TO_DS(x)             ((x) / 100.0F)
+#define GRAMS_TO_MILLIGRAMS(x)  ((x) * 1000.0F)
 
 void CloudStream::reconnect() {
   // Loop until we're reconnected
@@ -46,9 +49,24 @@ void CloudStream::begin()
     Serial.println(WiFi.localIP());
     m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
     m_client.setCallback(m_callback);
+
+    m_infoTimer.pause();
 }
 
-void CloudStream::runCloudStream(JsonDocument& sensorJsonDoc, JsonDocument& infoJsonDoc)
+void CloudStream::packageSensorData(JsonDocument& jsonDoc)
+{
+    jsonDoc["w"] = lroundf(GRAMS_TO_MILLIGRAMS(m_pumpController.getWeight()));
+    jsonDoc["p"] = lroundf(456.5F);
+    jsonDoc["tm"] = "323";
+    jsonDoc["ti"] = lroundf(MS_TO_DS(m_brewTimer.getCount()));
+}
+
+void CloudStream::packageInfoData(JsonDocument& jsonDoc)
+{
+
+}
+
+void CloudStream::runCloudStream()
 {
     if (!m_client.connected()) 
     {
@@ -56,8 +74,11 @@ void CloudStream::runCloudStream(JsonDocument& sensorJsonDoc, JsonDocument& info
     }
     m_client.loop();
     
-    if (m_sensorValsTimer.updateTimer())
+    if (m_sensorValsTimer.updateAndCheckTimer())
     {
+        StaticJsonDocument<150> sensorJsonDoc;
+        packageSensorData(sensorJsonDoc);
+
         size_t bufferSize_bytes = sensorJsonDoc.memoryUsage();
         char buffer[bufferSize_bytes];
         size_t n = serializeJson(sensorJsonDoc, buffer, bufferSize_bytes);
@@ -67,14 +88,17 @@ void CloudStream::runCloudStream(JsonDocument& sensorJsonDoc, JsonDocument& info
         m_sensorValsTimer.reset();
     }
 
-    if (m_infoTimer.updateTimer())
+    if (m_infoTimer.updateAndCheckTimer())
     {
+        StaticJsonDocument<150> infoJsonDoc;
+        packageInfoData(infoJsonDoc);
+
         size_t bufferSize_bytes = infoJsonDoc.memoryUsage();
         char buffer[bufferSize_bytes];
         size_t n = serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
         m_client.publish("espresso1/info", buffer, n);    
         Serial.println(buffer);    
         
-        m_sensorValsTimer.reset();
+        m_infoTimer.reset();
     }
 }

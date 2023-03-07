@@ -6,8 +6,6 @@
 #include "SwTimer.h"
 
 #define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))
-#define SENSOR_VALS_CYCLE_PERIOD_MS    (250U)
-#define MACHINE_INFO_CYCLE_PERIOD_MS   (10000)
 #define TIMER_TIC_PERIOD_MS            (1U)
 
 struct MachineCmdVals
@@ -30,11 +28,9 @@ class EspressoMachine
 {
     public:
         EspressoMachine() : m_brewTimer(BREW_TIMER_MAX_LEN_MS, TIMER_TIC_PERIOD_MS),
-                            m_sensorValsTimer(SENSOR_VALS_CYCLE_PERIOD_MS, TIMER_TIC_PERIOD_MS),
-                            m_infoTimer(MACHINE_INFO_CYCLE_PERIOD_MS, TIMER_TIC_PERIOD_MS),
                             m_pumpController1(),
                             m_cloudStream1(m_espressoMachineName, commandsCallback,
-                                            m_sensorValsTimer, m_infoTimer) {}
+                                           m_brewTimer, m_pumpController1) {}
 
         ~EspressoMachine() {}
 

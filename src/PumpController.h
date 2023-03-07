@@ -21,9 +21,14 @@ class PumpController : public Controller
         void beginController();
         void runController();
 
-        float getWeight()
+        float getWeight() const
         {
             return m_weight_g;
+        }
+
+        bool shotComplete() const
+        {
+            return (m_weight_g >= m_targetWeight_g);
         }
 
         void setTareRequest()
@@ -34,11 +39,6 @@ class PumpController : public Controller
         void setTargetWeight(float weight_g)
         {
             weight_g = m_targetWeight_g;
-        }
-
-        bool shotComplete()
-        {
-            return (m_weight_g >= m_targetWeight_g);
         }
 
     private:
