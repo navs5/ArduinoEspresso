@@ -10,7 +10,7 @@
 
 #define SENSOR_VALS_CYCLE_PERIOD_MS    (250U)
 #define MACHINE_INFO_CYCLE_PERIOD_MS   (10000)
-#define TIMER_TIC_PERIOD_MS            (1U)
+#define TIMER_TIC_PERIOD_MS            (10U)
 
 class CloudStream
 {

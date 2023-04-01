@@ -9,7 +9,7 @@ enum GeneralCommands {
     RESET_TIMER = 4U
 };
 
-MachineCmdVals EspressoMachine::m_machineCmdVals = {};
+MachineCmdVals EspressoMachine::m_machineCmdVals {};
 
 bool isDigit(char a)
 {
@@ -121,6 +121,7 @@ void EspressoMachine::commandsCallback(char* p_topic, uint8_t* p_message, unsign
 void EspressoMachine::begin()
 {
     m_brewTimer.pause();
+    m_machineCmdVals.brewTimerPause = true;
     m_cloudStream1.begin();
     m_pumpController1.beginController();
 }
@@ -150,13 +151,14 @@ void EspressoMachine::processCommandRequests()
     }
 }
 
-void EspressoMachine::runMachine1kHz()
+void EspressoMachine::runMachine100Hz()
 {
     // Run pump controller for regulated pressure and weight
     m_pumpController1.runController();
 
     // Run the brew shot length timer
     m_brewTimer.updateAndCheckTimer();
+    // Serial.printf("count: %d\n", m_brewTimer.getCount());
 
     // Run module to publish machine data to server
     m_cloudStream1.runCloudStream();

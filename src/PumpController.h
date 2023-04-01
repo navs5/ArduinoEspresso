@@ -13,9 +13,7 @@ class Controller
 class PumpController : public Controller
 {
     public:
-        PumpController() : m_weight_g(0.0F),
-                           m_targetWeight_g(0.0F),
-                           m_tareRequested(false) {}
+        PumpController() {}
         ~PumpController() {}
 
         void beginController();
@@ -23,12 +21,12 @@ class PumpController : public Controller
 
         float getWeight() const
         {
-            return m_weight_g;
+            return (m_weight1_g+m_weight2_g);
         }
 
         bool shotComplete() const
         {
-            return (m_weight_g >= m_targetWeight_g);
+            return ((m_weight1_g+m_weight2_g) >= m_targetWeight_g);
         }
 
         void setTareRequest()
@@ -46,9 +44,14 @@ class PumpController : public Controller
         void processController();
         void writeOutputs();
 
-        float m_weight_g;
-        float m_targetWeight_g;
-        float m_tareRequested;
+        static constexpr uint32_t m_kMaxTareCount {10U};  // Number of values to average for taring
+        float m_weight1_g {0.0F};
+        float m_weight2_g {0.0F};
+        float m_targetWeight_g {0.0F};
+        float m_offsetWeight1_g {0.0F};
+        float m_offsetWeight2_g {0.0F};
+        uint32_t m_tareCount {0U};
+        bool m_tareRequested {false};
         HX711 m_scale1;
         HX711 m_scale2;
 };
