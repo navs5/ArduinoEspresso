@@ -4,10 +4,10 @@
 #define calibration1_factor 728.951
 #define calibration2_factor -674.231
 
-#define LOADCELL1_DOUT_PIN  4
-#define LOADCELL1_SCK_PIN  2
-#define LOADCELL2_DOUT_PIN  23
-#define LOADCELL2_SCK_PIN  5
+#define LOADCELL1_DOUT_PIN   4
+#define LOADCELL1_SCK_PIN    2
+#define LOADCELL2_DOUT_PIN   23
+#define LOADCELL2_SCK_PIN    5
 
 
 void PumpController::beginController()

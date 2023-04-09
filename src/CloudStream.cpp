@@ -5,6 +5,8 @@
 #define MS_TO_DS(x)             ((x) / 100.0F)
 #define GRAMS_TO_MILLIGRAMS(x)  ((x) * 1000.0F)
 
+// TODO: Check for when wifi gets disconnected
+
 void CloudStream::reconnect() {
   // Loop until we're reconnected
     while (!m_client.connected()) 
@@ -29,24 +31,6 @@ void CloudStream::reconnect() {
 
 void CloudStream::begin()
 {
-    // We start by connecting to a WiFi network
-    delay(10);
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(NodeCredentials::wifi_ssid);
-
-    WiFi.begin(NodeCredentials::wifi_ssid, NodeCredentials::wifi_pwd);
-
-    while (WiFi.status() != WL_CONNECTED) 
-    {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
     m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
     m_client.setCallback(m_callback);
 
@@ -83,7 +67,7 @@ void CloudStream::runCloudStream()
         char buffer[bufferSize_bytes];
         size_t n = serializeJson(sensorJsonDoc, buffer, bufferSize_bytes);
         m_client.publish("espresso1/sensorVals", buffer, n);    
-        Serial.println(buffer);    
+        // Serial.println(buffer);    
 
         m_sensorValsTimer.reset();
     }
@@ -97,7 +81,7 @@ void CloudStream::runCloudStream()
         char buffer[bufferSize_bytes];
         size_t n = serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
         m_client.publish("espresso1/info", buffer, n);    
-        Serial.println(buffer);    
+        // Serial.println(buffer);    
         
         m_infoTimer.reset();
     }
