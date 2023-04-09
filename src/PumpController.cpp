@@ -19,6 +19,8 @@ void PumpController::beginController()
     m_scale1.tare(10U);	//Reset the scale to 0
     m_scale2.tare(10U);	//Reset the scale to 0
 
+    m_brewTimer.pause();
+
     // long zero_factor = scale1.read_average(); //Get a baseline reading
     Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
     Serial.println(m_scale1.get_offset());
@@ -28,6 +30,7 @@ void PumpController::beginController()
 void PumpController::runController()
 {
     readInputs();
+    processCommandRequests();
     processController();
     writeOutputs();
 }
@@ -47,14 +50,6 @@ void PumpController::readInputs()
     if ( validRead2 )
     {
         m_weight2_g = weight2_g;
-    }
-
-    // Perform tare if requested
-    if ( m_tareRequested )
-    {
-        m_scale1.tare(10U);
-        m_scale2.tare(10U);
-        m_tareRequested = false;
     }
 
     // if ( m_tareRequested )
@@ -86,8 +81,38 @@ void PumpController::readInputs()
     // }
 }
 
+void PumpController::processCommandRequests()
+{
+    if ( m_machineCmdVals.tareRequest )
+    {
+        m_scale1.tare(10U);
+        m_scale2.tare(10U);
+        m_machineCmdVals.tareRequest = false;
+    }
+
+    if ( m_machineCmdVals.brewTimerPause )
+    {
+        m_brewTimer.pause();
+    }
+    else
+    {
+        m_brewTimer.resume();
+    }
+
+    if ( m_machineCmdVals.brewTimerReset )
+    {
+        m_brewTimer.pause();
+        m_brewTimer.reset();
+        m_machineCmdVals.brewTimerPause = true;
+        m_machineCmdVals.brewTimerReset = false;
+    }
+}
+
 void PumpController::processController()
 {
+    // Run the brew shot length timer
+    m_brewTimer.updateAndCheckTimer();
+    // Serial.printf("count: %d\n", m_brewTimer.getCount());
 
 }
 
