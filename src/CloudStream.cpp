@@ -4,6 +4,9 @@
 #define MS_TO_S(x)              ((x) / 1000.0F)
 #define MS_TO_DS(x)             ((x) / 100.0F)
 #define GRAMS_TO_MILLIGRAMS(x)  ((x) * 1000.0F)
+#define GRAMS_TO_DECIGRAMS(x)   ((x) * 100.0F)
+#define BAR_TO_DECIBAR(x)       ((x) * 100.0F)
+#define C_TO_DECIBAR(x)         ((x) * 100.0F)
 
 #define WITHIN(A, MIN, MAX)       ((A >= MIN) && (A <= MAX))
 #define CHARS_TO_DIGITS_FAIL_VAL  (UINT32_MAX)
@@ -30,7 +33,7 @@ bool isDigit(char a)
     return WITHIN(a, '0', '9');
 }
 
-uint32_t charsToDigits(const uint8_t* const payload, unsigned int length)
+float charsToDigits(const uint8_t* const payload, unsigned int length)
 {
     if (length > 9U || length < 1)
     {
@@ -40,19 +43,34 @@ uint32_t charsToDigits(const uint8_t* const payload, unsigned int length)
 
     uint32_t payloadVal = 0U;
     uint32_t scale = 1U;
+    uint32_t divisor = 1U;
+    bool periodEncountered = false;
     for(int32_t i = (length-1U); i >= 0; --i)
     {
-        uint8_t charDigit = payload[i];
+        const uint8_t charDigit = payload[i];
+        const bool isPeriod = (charDigit == '.');
+        if (isPeriod)
+        {
+            periodEncountered = true;
+            continue;
+        }
+
         if (!isDigit(charDigit))
         {
             return CHARS_TO_DIGITS_FAIL_VAL;
         }
 
         payloadVal += (scale * (charDigit - '0'));
-        scale *= 10U;        
+        scale *= 10U;
+
+        // Because looping backwards, keep scaling until period encountered
+        if (!periodEncountered)
+        {
+            divisor *= 10U;
+        }
     }
 
-    return payloadVal;
+    return periodEncountered ? ((float)payloadVal / (float)divisor) : payloadVal;
 }
 
 void processCmdPayload(const uint8_t* const payload, unsigned int length)
@@ -91,7 +109,7 @@ void processCmdPayload(const uint8_t* const payload, unsigned int length)
 
 void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, unsigned int length)
 {
-    uint32_t payloadVal = charsToDigits(payload, length);
+    float payloadVal = charsToDigits(payload, length);
 
     if (payloadVal == CHARS_TO_DIGITS_FAIL_VAL)
     {
@@ -104,16 +122,19 @@ void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, uns
         case MachineTarget_E::WEIGHT:
         {
             machineCmdVals.targetWeight_g = payloadVal;
+            machineCmdVals.targetValsUpdated = true;
             break;
         }
         case MachineTarget_E::PRESSURE:
         {
-            machineCmdVals.targetPressure_bar = payloadVal;
+            machineCmdVals.targetPressure_bar = payloadVal;            
+            machineCmdVals.targetValsUpdated = true;
             break;
         }
         case MachineTarget_E::TEMPERATURE:
         {
             machineCmdVals.targetTemperature_C = payloadVal;
+            machineCmdVals.targetValsUpdated = true;
             break;
         }
         default:
@@ -168,7 +189,10 @@ void CloudStream::reconnect() {
         {
             Serial.println("connected");
             // Subscribe
-            m_client.subscribe("espresso1/cmd/general");
+            m_client.subscribe("espresso1/cmd/general");  // TODO: Grab topic names from config
+            m_client.subscribe("espresso1/cmd/setTargetWeight_g"); 
+            m_client.subscribe("espresso1/cmd/setPress_bar"); 
+            m_client.subscribe("espresso1/cmd/setTemp_C"); 
         } else 
         {
             Serial.print("failed, rc=");
@@ -198,9 +222,9 @@ void CloudStream::packageSensorData(JsonDocument& jsonDoc)
 
 void CloudStream::packageInfoData(JsonDocument& jsonDoc)
 {
-    jsonDoc["tw"] = machineCmdVals.targetWeight_g;
-    jsonDoc["tp"] = machineCmdVals.targetPressure_bar;
-    jsonDoc["tt"] = machineCmdVals.targetTemperature_C;
+    jsonDoc["tw"] = lroundf(GRAMS_TO_DECIGRAMS(machineCmdVals.targetWeight_g));
+    jsonDoc["tp"] = lround((BAR_TO_DECIBAR(machineCmdVals.targetPressure_bar)));
+    jsonDoc["tt"] = lround((C_TO_DECIBAR(machineCmdVals.targetTemperature_C)));
 }
 
 void CloudStream::runCloudStream()
@@ -225,6 +249,13 @@ void CloudStream::runCloudStream()
         m_sensorValsTimer.reset();
     }
 
+    // Immediately post config values if recently changed
+    if (machineCmdVals.targetValsUpdated)
+    {
+        machineCmdVals.targetValsUpdated = false;
+        m_infoTimer.expire();
+    }
+
     if (m_infoTimer.updateAndCheckTimer())
     {
         StaticJsonDocument<150> infoJsonDoc;
@@ -233,7 +264,7 @@ void CloudStream::runCloudStream()
         size_t bufferSize_bytes = infoJsonDoc.memoryUsage();
         char buffer[bufferSize_bytes];
         size_t n = serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
-        m_client.publish("espresso1/info", buffer, n);    
+        m_client.publish("espresso1/config", buffer, n);    
         Serial.println(buffer);    
         
         m_infoTimer.reset();

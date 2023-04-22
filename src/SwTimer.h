@@ -47,6 +47,11 @@ class SwDownTimer
             m_timerPause = false;
         }
 
+        void expire()
+        {
+            m_timerCount = 0U;
+        }
+
         bool updateAndCheckTimer()
         {
             return updateAndCheckTimer(m_timeStepLength);

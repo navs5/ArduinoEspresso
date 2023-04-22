@@ -11,9 +11,10 @@ struct MachineCmdVals_S
     bool tareRequest;
     bool brewTimerPause;
     bool brewTimerReset;
-    uint32_t targetPressure_bar;
-    uint32_t targetTemperature_C;
-    uint32_t targetWeight_g;
+    bool targetValsUpdated;
+    float targetPressure_bar;
+    float targetTemperature_C;
+    float targetWeight_g;
 };
 
 }  // namespace EspressoMachine
