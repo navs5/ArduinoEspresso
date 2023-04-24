@@ -1,4 +1,5 @@
 #include "PumpController.h"
+#include <ArduinoJson.h>
 
 
 #define calibration1_factor 728.951
@@ -20,6 +21,7 @@ void PumpController::beginController()
     m_scale2.tare(10U);	//Reset the scale to 0
 
     m_brewTimer.pause();
+    m_machineCmdVals.brewTimerPause = true;
 
     // long zero_factor = scale1.read_average(); //Get a baseline reading
     Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
@@ -33,6 +35,7 @@ void PumpController::runController()
     processCommandRequests();
     processController();
     writeOutputs();
+    processAlerts();
 }
 
 void PumpController::readInputs()
@@ -51,6 +54,13 @@ void PumpController::readInputs()
     {
         m_weight2_g = weight2_g;
     }
+    if ( validRead1 && validRead2 )
+    {
+        m_weight_g = m_weight1_g + m_weight2_g;
+    }
+
+    // TODO: TAKE OUT
+    m_weight_g = m_brewTimer.getCount() / 1000.0F;
 
     // if ( m_tareRequested )
     // {
@@ -105,6 +115,16 @@ void PumpController::processCommandRequests()
         m_brewTimer.reset();
         m_machineCmdVals.brewTimerPause = true;
         m_machineCmdVals.brewTimerReset = false;
+
+        // Clear target reached time
+        StaticJsonDocument<50> alertJsonDoc;
+        alertJsonDoc["tt_ms"] = 0U;
+        size_t bufferSize_bytes = alertJsonDoc.memoryUsage();
+        char serializedData[bufferSize_bytes];
+        serializeJson(alertJsonDoc, serializedData, bufferSize_bytes);
+        m_targetWeightAlertSet = false;
+        AlertPayload clearAlert = {.alertName="targetWeightReached", .alertPayload=serializedData};
+        addAlert(clearAlert);
     }
 }
 
@@ -113,10 +133,38 @@ void PumpController::processController()
     // Run the brew shot length timer
     m_brewTimer.updateAndCheckTimer();
     // Serial.printf("count: %d\n", m_brewTimer.getCount());
-
 }
 
 void PumpController::writeOutputs()
 {
 
+}
+
+void PumpController::processAlerts()
+{
+    const bool weightReached = (m_weight_g >= m_machineCmdVals.targetWeight_g);
+
+    if ( !m_targetWeightAlertSet && m_brewTimer.isRunning() && weightReached )
+    {
+        if (m_targetWeightQualTimer.updateAndCheckTimer())  // Add some qualification to prevent hair trigger
+        {
+            StaticJsonDocument<50> alertJsonDoc;
+            alertJsonDoc["tt_ms"] = m_brewTimer.getCount();
+            size_t bufferSize_bytes = alertJsonDoc.memoryUsage();  // TODO: Look into why byte size set to 16
+            char serializedData[bufferSize_bytes];
+            serializeJson(alertJsonDoc, serializedData, bufferSize_bytes);
+
+            
+            AlertPayload myAlert {.alertName="targetWeightReached", .alertPayload=serializedData};
+            printf("Adding alert payload: ");
+            printf(serializedData);
+            printf("\n\n");
+            addAlert(myAlert);
+            m_targetWeightAlertSet = true;
+        }
+    }
+    else
+    {
+        m_targetWeightQualTimer.reset();
+    }
 }

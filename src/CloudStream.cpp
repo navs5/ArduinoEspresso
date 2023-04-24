@@ -122,19 +122,19 @@ void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, uns
         case MachineTarget_E::WEIGHT:
         {
             machineCmdVals.targetWeight_g = payloadVal;
-            machineCmdVals.targetValsUpdated = true;
+            machineCmdVals.configUpdated = true;
             break;
         }
         case MachineTarget_E::PRESSURE:
         {
             machineCmdVals.targetPressure_bar = payloadVal;            
-            machineCmdVals.targetValsUpdated = true;
+            machineCmdVals.configUpdated = true;
             break;
         }
         case MachineTarget_E::TEMPERATURE:
         {
             machineCmdVals.targetTemperature_C = payloadVal;
-            machineCmdVals.targetValsUpdated = true;
+            machineCmdVals.configUpdated = true;
             break;
         }
         default:
@@ -178,6 +178,34 @@ void commandsCallback(char* p_topic, uint8_t* p_message, unsigned int length)
     }
 }
 
+void CloudStream::begin()
+{
+    m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
+    m_client.setCallback(static_cast<std::function<void(char*, uint8_t*, unsigned int)>>(commandsCallback));
+    machineCmdVals.configUpdated = true;
+}
+
+void CloudStream::runCloudStream()
+{
+    m_msgsSentCurrentRun = 0U;
+
+    if (!m_client.connected()) 
+    {
+        reconnect();
+    }
+    m_client.loop();
+
+    // Immediately post config values if recently changed
+    if (machineCmdVals.configUpdated)
+    {
+        machineCmdVals.configUpdated = false;
+        m_infoTimer.expire();
+    }
+
+    postAlerts();
+    postPeriodicMessages();
+}
+
 void CloudStream::reconnect() {
   // Loop until we're reconnected
   // TODO: Make this non-blocking and check for wifi connection
@@ -204,12 +232,56 @@ void CloudStream::reconnect() {
     }
 }
 
-void CloudStream::begin()
+void CloudStream::postAlerts()
 {
-    m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
-    m_client.setCallback(static_cast<std::function<void(char*, uint8_t*, unsigned int)>>(commandsCallback));
+    std::vector<Controller*> alertControllers {&m_pumpController};
 
-    machineCmdVals.brewTimerPause = true;
+    for (Controller* currController : alertControllers)
+    {
+        while ((m_msgsSentCurrentRun < m_maxMsgsPerRun) && currController->alertPresent())
+        {
+            AlertPayload alertToSend {};
+            currController->getAlert(alertToSend);
+            
+            // TODO: grab topic name from AlertPayload
+            m_client.publish("espresso1/alert/targetWeightReached", alertToSend.alertPayload.c_str());       
+
+            m_msgsSentCurrentRun++;
+        }
+    }    
+}
+
+void CloudStream::postPeriodicMessages()
+{
+    if (m_sensorValsTimer.updateAndCheckTimer() && (m_msgsSentCurrentRun < m_maxMsgsPerRun))
+    {
+        StaticJsonDocument<150> sensorJsonDoc;
+        packageSensorData(sensorJsonDoc);
+
+        size_t bufferSize_bytes = sensorJsonDoc.memoryUsage();
+        char buffer[bufferSize_bytes];
+        serializeJson(sensorJsonDoc, buffer, bufferSize_bytes);
+        m_client.publish("espresso1/sensorVals", buffer);    
+        m_msgsSentCurrentRun++;
+        // Serial.println(buffer);    
+
+        m_sensorValsTimer.reset();
+    }
+
+    if (m_infoTimer.updateAndCheckTimer() && (m_msgsSentCurrentRun < m_maxMsgsPerRun))
+    {
+        StaticJsonDocument<150> infoJsonDoc;
+        packageInfoData(infoJsonDoc);
+
+        size_t bufferSize_bytes = infoJsonDoc.memoryUsage();
+        char buffer[bufferSize_bytes];
+        serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
+        m_client.publish("espresso1/config", buffer);
+        m_msgsSentCurrentRun++;    
+        // Serial.println(buffer);    
+        
+        m_infoTimer.reset();
+    }
 }
 
 void CloudStream::packageSensorData(JsonDocument& jsonDoc)
@@ -225,48 +297,4 @@ void CloudStream::packageInfoData(JsonDocument& jsonDoc)
     jsonDoc["tw"] = lroundf(GRAMS_TO_DECIGRAMS(machineCmdVals.targetWeight_g));
     jsonDoc["tp"] = lround((BAR_TO_DECIBAR(machineCmdVals.targetPressure_bar)));
     jsonDoc["tt"] = lround((C_TO_DECIBAR(machineCmdVals.targetTemperature_C)));
-}
-
-void CloudStream::runCloudStream()
-{
-    if (!m_client.connected()) 
-    {
-        reconnect();
-    }
-    m_client.loop();
-    
-    if (m_sensorValsTimer.updateAndCheckTimer())
-    {
-        StaticJsonDocument<150> sensorJsonDoc;
-        packageSensorData(sensorJsonDoc);
-
-        size_t bufferSize_bytes = sensorJsonDoc.memoryUsage();
-        char buffer[bufferSize_bytes];
-        size_t n = serializeJson(sensorJsonDoc, buffer, bufferSize_bytes);
-        m_client.publish("espresso1/sensorVals", buffer, n);    
-        // Serial.println(buffer);    
-
-        m_sensorValsTimer.reset();
-    }
-
-    // Immediately post config values if recently changed
-    if (machineCmdVals.targetValsUpdated)
-    {
-        machineCmdVals.targetValsUpdated = false;
-        m_infoTimer.expire();
-    }
-
-    if (m_infoTimer.updateAndCheckTimer())
-    {
-        StaticJsonDocument<150> infoJsonDoc;
-        packageInfoData(infoJsonDoc);
-
-        size_t bufferSize_bytes = infoJsonDoc.memoryUsage();
-        char buffer[bufferSize_bytes];
-        size_t n = serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
-        m_client.publish("espresso1/config", buffer, n);    
-        Serial.println(buffer);    
-        
-        m_infoTimer.reset();
-    }
 }

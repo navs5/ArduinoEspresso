@@ -26,6 +26,11 @@ class SwDownTimer
             return (m_timerCount == 0U);
         }
 
+        bool isRunning() const
+        {
+            return (!m_timerPause && (!isExpired()) && (m_timerCount < m_timerLength));
+        }
+
         void reset()
         {
             m_timerCount = m_timerLength;
@@ -104,7 +109,12 @@ class SwUpTimer
 
         bool isExpired() const
         {
-            return (m_timerCount == m_timerLength);
+            return (m_timerCount >= m_timerLength);
+        }
+
+        bool isRunning() const
+        {
+            return (!m_timerPause && (!isExpired()) && (m_timerCount > 0U));
         }
 
         void reset()

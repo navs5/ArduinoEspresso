@@ -17,7 +17,7 @@ class EspressoMachine
         void runMachine100Hz();
 
     private:
-        const String m_espressoMachineName = "espresso1";
+        const std::string m_espressoMachineName = "espresso1";
         PumpController m_pumpController1 {machineCmdVals};
         CloudStream m_cloudStream1 {m_espressoMachineName,
                                     m_pumpController1};
