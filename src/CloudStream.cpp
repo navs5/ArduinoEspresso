@@ -14,7 +14,8 @@
 enum GeneralCommands_E {
     SCALE_TARE = 1U,
     START_STOP_TIMER = 2U,
-    RESET_TIMER = 4U
+    RESET_TIMER = 4U,
+    ENABLE_PREFUSION = 8U,
 };
 
 enum MachineTarget_E
@@ -98,6 +99,12 @@ void processCmdPayload(const uint8_t* const payload, unsigned int length)
         case RESET_TIMER:
         {
             machineCmdVals.brewTimerReset = true;
+            break;
+        }
+        case ENABLE_PREFUSION:
+        {
+            machineCmdVals.prefusionEnable = !machineCmdVals.prefusionEnable;
+            machineCmdVals.configUpdated = true;
             break;
         }
         default:
@@ -297,4 +304,5 @@ void CloudStream::packageInfoData(JsonDocument& jsonDoc)
     jsonDoc["tw"] = lroundf(GRAMS_TO_DECIGRAMS(machineCmdVals.targetWeight_g));
     jsonDoc["tp"] = lround((BAR_TO_DECIBAR(machineCmdVals.targetPressure_bar)));
     jsonDoc["tt"] = lround((C_TO_DECIBAR(machineCmdVals.targetTemperature_C)));
+    jsonDoc["pf"] = (machineCmdVals.prefusionEnable ? 1U : 0U);
 }

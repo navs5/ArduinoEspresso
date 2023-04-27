@@ -12,6 +12,7 @@ struct MachineCmdVals_S
     bool brewTimerPause;
     bool brewTimerReset;
     bool configUpdated;
+    bool prefusionEnable;
     float targetPressure_bar;
     float targetTemperature_C;
     float targetWeight_g;

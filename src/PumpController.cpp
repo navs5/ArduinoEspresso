@@ -59,9 +59,6 @@ void PumpController::readInputs()
         m_weight_g = m_weight1_g + m_weight2_g;
     }
 
-    // TODO: TAKE OUT
-    m_weight_g = m_brewTimer.getCount() / 1000.0F;
-
     // if ( m_tareRequested )
     // {
     //     if ( validReads )
