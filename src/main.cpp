@@ -6,20 +6,19 @@
 #include <ESPmDNS.h>
 #include <Update.h>
 #include "Credentials.h"
+#include "Config.h"
 #include "webServerPages.hpp"
-
-#define PUMP_CTLR_PWM  25
-#define HOST_NAME      "espresso"
 
 EspressoMachine machine1;
 WebServer server(80);
 
 
-void setup() 
+void setup()
 {
     // Set all pins to default values
-    pinMode(PUMP_CTLR_PWM, OUTPUT);
-    digitalWrite(PUMP_CTLR_PWM, HIGH);
+    ledcSetup(EspressoConfig::pwmChannel_pumpCtlr, EspressoConfig::pwmFreq_pumpCtlr, EspressoConfig::pwmResolution_pumpCtlr);
+    ledcAttachPin(EspressoConfig::pin_pumpCtlr, EspressoConfig::pwmChannel_pumpCtlr);
+    ledcWrite(EspressoConfig::pwmChannel_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);  // Default pwm to high
 
     delay(10);
     Serial.begin(9600);
@@ -31,11 +30,11 @@ void setup()
     WiFi.begin(NodeCredentials::wifi_ssid, NodeCredentials::wifi_pwd);
 
     size_t counter = 0U;
-    while (WiFi.status() != WL_CONNECTED) 
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(".");
-        
+
         if ( counter > 20U )
         {
             Serial.println("Could not connect...Restarting ESP");
@@ -45,7 +44,7 @@ void setup()
     }
 
     /*use mdns for host name resolution*/
-    if (!MDNS.begin(HOST_NAME))  //http://esp32resso.local
+    if (!MDNS.begin(EspressoConfig::mdnsHostName))  //http://esp32resso.local
     {
         Serial.println("Error setting up MDNS responder!");
         // TODO: Add retry mechanism here
@@ -62,13 +61,13 @@ void setup()
         server.send(200, "text/html", WebServerHtml::serverIndex);
     });
     /*handling uploading firmware file */
-    server.on("/update", 
-        HTTP_POST, 
+    server.on("/update",
+        HTTP_POST,
         []() {
             server.sendHeader("Connection", "close");
             server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
             ESP.restart();
-        }, 
+        },
         []() {
             HTTPUpload& upload = server.upload();
             if (upload.status == UPLOAD_FILE_START) {
@@ -94,7 +93,7 @@ void setup()
     machine1.begin();
 }
 
-void loop() 
+void loop()
 {
     server.handleClient();
 

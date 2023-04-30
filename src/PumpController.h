@@ -4,16 +4,28 @@
 #include "HX711.h"
 #include "SwTimer.h"
 #include "EspressoMachine_types.h"
+#include "Config.h"
 #include <queue>
 
-#define TARGET_WEIGHT_QUAL_TIME_MS     (300)
-#define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))
-#define TIMER_TIC_PERIOD_MS            (10U)
+#define PUMP_MODULE_PERIOD_MS          (10U)            // Period of pump module
+#define PREFUSION_END_QUAL_COUNT       (3U)             // Prefusion will end after this many consecutive counts of required weight
+#define TARGET_WEIGHT_QUAL_TIME_MS     (300)            // Post target weight time after weight is reached for this amount of time
+#define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))  // Max amount of time to run brew timer
+#define INIT_PUMP_FULL_POWER_TIME_MS   (S_TO_MS(30U))   // Amount of time to run pump at full power out of power up
+#define PUMP_PREFUSION_TO_BREW_TIME_MS (S_TO_MS(3U))    // Time it takes to transition pump power from prefusion level to brew level
+#define PUMP_BREW_TO_PREFUSION_TIME_MS (S_TO_MS(2U))    // Time it takes to transition pump power from brew level to prefusion level
 
 struct AlertPayload
 {
     std::string alertName;
     std::string alertPayload;
+};
+
+enum PumpCtlrState
+{
+    INIT,
+    PREFUSION,
+    BREW,
 };
 
 class Controller
@@ -115,16 +127,22 @@ class PumpController final : public Controller
 
         EspressoMachineNs::MachineCmdVals_S& m_machineCmdVals;
         static constexpr uint32_t m_kMaxTareCount {10U};  // Number of values to average for taring
-        SwUpTimer m_brewTimer {BREW_TIMER_MAX_LEN_MS, TIMER_TIC_PERIOD_MS};
-        SwDownTimer m_targetWeightQualTimer {TARGET_WEIGHT_QUAL_TIME_MS, TIMER_TIC_PERIOD_MS};
+        SwUpTimer m_brewTimer {BREW_TIMER_MAX_LEN_MS, PUMP_MODULE_PERIOD_MS};
+        SwDownTimer m_targetWeightQualTimer {TARGET_WEIGHT_QUAL_TIME_MS, PUMP_MODULE_PERIOD_MS};
+        SwDownTimer m_initFullPowerTimer {INIT_PUMP_FULL_POWER_TIME_MS, PUMP_MODULE_PERIOD_MS};
+        uint32_t m_prefusionEndQualCount {0U};
+        float m_pumpRateChange {0.0F};
         float m_weight1_g {0.0F};
         float m_weight2_g {0.0F};
         float m_weight_g {0.0F};
         float m_offsetWeight1_g {0.0F};
         float m_offsetWeight2_g {0.0F};
+        float m_pumpPwm {EspressoConfig::maxDuty_pumpCtlr};
         uint32_t m_tareCount {0U};
         bool m_tareRequested {false};
         bool m_targetWeightAlertSet {false};
+        bool m_prevPrefusionCmd {true};
+        PumpCtlrState m_pumpState {PumpCtlrState::INIT};
         HX711 m_scale1 {};
         HX711 m_scale2 {};
 };

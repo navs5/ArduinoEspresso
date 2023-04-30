@@ -134,7 +134,7 @@ void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, uns
         }
         case MachineTarget_E::PRESSURE:
         {
-            machineCmdVals.targetPressure_bar = payloadVal;            
+            machineCmdVals.targetPressure_bar = payloadVal;
             machineCmdVals.configUpdated = true;
             break;
         }
@@ -189,14 +189,13 @@ void CloudStream::begin()
 {
     m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
     m_client.setCallback(static_cast<std::function<void(char*, uint8_t*, unsigned int)>>(commandsCallback));
-    machineCmdVals.configUpdated = true;
 }
 
 void CloudStream::runCloudStream()
 {
     m_msgsSentCurrentRun = 0U;
 
-    if (!m_client.connected()) 
+    if (!m_client.connected())
     {
         reconnect();
     }
@@ -216,19 +215,19 @@ void CloudStream::runCloudStream()
 void CloudStream::reconnect() {
   // Loop until we're reconnected
   // TODO: Make this non-blocking and check for wifi connection
-    while (!m_client.connected()) 
+    while (!m_client.connected())
     {
         Serial.print("Attempting MQTT connection...");
         // Attempt to connect
-        if (m_client.connect(m_nodeName.c_str(), NodeCredentials::mqttServer_username, NodeCredentials::mqttServer_pwd)) 
+        if (m_client.connect(m_nodeName.c_str(), NodeCredentials::mqttServer_username, NodeCredentials::mqttServer_pwd))
         {
             Serial.println("connected");
             // Subscribe
             m_client.subscribe("espresso1/cmd/general");  // TODO: Grab topic names from config
-            m_client.subscribe("espresso1/cmd/setTargetWeight_g"); 
-            m_client.subscribe("espresso1/cmd/setPress_bar"); 
-            m_client.subscribe("espresso1/cmd/setTemp_C"); 
-        } else 
+            m_client.subscribe("espresso1/cmd/setTargetWeight_g");
+            m_client.subscribe("espresso1/cmd/setPress_bar");
+            m_client.subscribe("espresso1/cmd/setTemp_C");
+        } else
         {
             Serial.print("failed, rc=");
             Serial.print(m_client.state());
@@ -249,13 +248,13 @@ void CloudStream::postAlerts()
         {
             AlertPayload alertToSend {};
             currController->getAlert(alertToSend);
-            
+
             // TODO: grab topic name from AlertPayload
-            m_client.publish("espresso1/alert/targetWeightReached", alertToSend.alertPayload.c_str());       
+            m_client.publish("espresso1/alert/targetWeightReached", alertToSend.alertPayload.c_str());
 
             m_msgsSentCurrentRun++;
         }
-    }    
+    }
 }
 
 void CloudStream::postPeriodicMessages()
@@ -268,9 +267,9 @@ void CloudStream::postPeriodicMessages()
         size_t bufferSize_bytes = sensorJsonDoc.memoryUsage();
         char buffer[bufferSize_bytes];
         serializeJson(sensorJsonDoc, buffer, bufferSize_bytes);
-        m_client.publish("espresso1/sensorVals", buffer);    
+        m_client.publish("espresso1/sensorVals", buffer);
         m_msgsSentCurrentRun++;
-        // Serial.println(buffer);    
+        // Serial.println(buffer);
 
         m_sensorValsTimer.reset();
     }
@@ -284,9 +283,9 @@ void CloudStream::postPeriodicMessages()
         char buffer[bufferSize_bytes];
         serializeJson(infoJsonDoc, buffer, bufferSize_bytes);
         m_client.publish("espresso1/config", buffer);
-        m_msgsSentCurrentRun++;    
-        // Serial.println(buffer);    
-        
+        m_msgsSentCurrentRun++;
+        // Serial.println(buffer);
+
         m_infoTimer.reset();
     }
 }
