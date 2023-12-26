@@ -39,16 +39,11 @@ void PumpController::beginController()
     m_scale2.begin(LOADCELL2_DOUT_PIN, LOADCELL2_SCK_PIN, 128U);
     m_scale1.set_scale(calibration1_factor);
     m_scale2.set_scale(calibration2_factor);
-    m_scale1.tare(10U);	//Reset the scale to 0
-    m_scale2.tare(10U);	//Reset the scale to 0
+    m_scale1.tare(20U);	//Reset the scale to 0
+    m_scale2.tare(20U);	//Reset the scale to 0
 
     m_brewTimer.pause();
     m_pumpState = PumpCtlrState::INIT;
-
-    // long zero_factor = scale1.read_average(); //Get a baseline reading
-    Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
-    Serial.println(m_scale1.get_offset());
-    Serial.println(m_scale2.get_offset());
 }
 
 void PumpController::runController()
@@ -76,38 +71,20 @@ void PumpController::readInputs()
     {
         m_weight2_g = weight2_g;
     }
-    if ( validRead1 && validRead2 )
+
+    m_weight_g = m_weight1_g + m_weight2_g;
+
+#if (DEBUG_MODE == 1U)
+    // Print each weight scale along with brew timer
+    static int32_t printCount = 0U;
+    if (printCount % 50 == 0)
     {
-        m_weight_g = m_weight1_g + m_weight2_g;
+        printf("%d : %f(%d) + %f(%d) = %f\n", m_brewTimer.getCount(), m_weight1_g, validRead1, m_weight2_g, validRead2, m_weight_g);
+        printCount = 0U;
     }
+    printCount++;
+#endif
 
-    // if ( m_tareRequested )
-    // {
-    //     if ( validReads )
-    //     {
-    //         m_offsetWeight1_g += weight1_g;
-    //         m_offsetWeight2_g += weight2_g;
-
-    //         m_tareCount++;
-    //     }
-
-    //     if ( m_tareCount >= m_kMaxTareCount )
-    //     {
-    //         m_offsetWeight1_g /= m_tareCount;
-    //         m_offsetWeight2_g /= m_tareCount;
-    //         m_scale1.set_offset(m_offsetWeight1_g);
-    //         m_scale2.set_offset(m_offsetWeight2_g);
-
-    //         m_tareRequested = false;
-    //     }
-    //     Serial.println("Taring");
-    // }
-    // else
-    // {
-    //     m_offsetWeight1_g = 0.0F;
-    //     m_offsetWeight2_g = 0.0F;
-    //     m_tareCount = 0U;
-    // }
 }
 
 void PumpController::processCommandRequests()
@@ -232,7 +209,7 @@ void PumpController::processController()
 
 void PumpController::writeOutputs()
 {
-    ledcWrite(EspressoConfig::pwmChannel_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);  // Default pwm to high
+    ledcWrite(EspressoConfig::pwmChannel_pumpCtlr, m_pumpPwm);
 }
 
 void PumpController::processAlerts()
@@ -250,11 +227,7 @@ void PumpController::processAlerts()
             char serializedData[bufferSize_bytes];
             serializeJson(alertJsonDoc, serializedData, bufferSize_bytes);
 
-
             AlertPayload myAlert {.alertName="targetWeightReached", .alertPayload=serializedData};
-            printf("Adding alert payload: ");
-            printf(serializedData);
-            printf("\n\n");
             addAlert(myAlert);
             m_targetWeightAlertSet = true;
         }

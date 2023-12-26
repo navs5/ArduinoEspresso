@@ -80,7 +80,9 @@ void processCmdPayload(const uint8_t* const payload, unsigned int length)
 
     if (payloadVal == CHARS_TO_DIGITS_FAIL_VAL)
     {
+#if (DEBUG_MODE == 1)
         Serial.print("Invalid general command payload\n");
+#endif
         return;
     }
 
@@ -120,7 +122,9 @@ void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, uns
 
     if (payloadVal == CHARS_TO_DIGITS_FAIL_VAL)
     {
+#if (DEBUG_MODE == 1)
         Serial.print("Invalid target command payload\n");
+#endif
         return;
     }
 
@@ -157,7 +161,9 @@ void commandsCallback(char* p_topic, uint8_t* p_message, unsigned int length)
 
     if ( p_specificTopic == nullptr )
     {
+#if (DEBUG_MODE == 1)
         Serial.println("Command topic not correctly formatted");
+#endif
         return;
     }
 
@@ -181,7 +187,9 @@ void commandsCallback(char* p_topic, uint8_t* p_message, unsigned int length)
     }
     else
     {
+#if (DEBUG_MODE == 1)
         Serial.println("Unrecognized command");
+#endif
     }
 }
 
@@ -189,6 +197,8 @@ void CloudStream::begin()
 {
     m_client.setServer(NodeCredentials::mqttServer_ip, 1883);
     m_client.setCallback(static_cast<std::function<void(char*, uint8_t*, unsigned int)>>(commandsCallback));
+
+    m_brewTimerPauseLast = machineCmdVals.brewTimerPause;
 }
 
 void CloudStream::runCloudStream()
@@ -259,6 +269,14 @@ void CloudStream::postAlerts()
 
 void CloudStream::postPeriodicMessages()
 {
+    // Sync the periodic update timer with the start of the brew timer
+    // so readings look clean on UI
+    if (m_brewTimerPauseLast && !machineCmdVals.brewTimerPause)
+    {
+        m_sensorValsTimer.expire();
+    }
+    m_brewTimerPauseLast = machineCmdVals.brewTimerPause;
+
     if (m_sensorValsTimer.updateAndCheckTimer() && (m_msgsSentCurrentRun < m_maxMsgsPerRun))
     {
         StaticJsonDocument<150> sensorJsonDoc;
@@ -272,6 +290,7 @@ void CloudStream::postPeriodicMessages()
         // Serial.println(buffer);
 
         m_sensorValsTimer.reset();
+        // Serial.println(millis());
     }
 
     if (m_infoTimer.updateAndCheckTimer() && (m_msgsSentCurrentRun < m_maxMsgsPerRun))

@@ -42,6 +42,7 @@ class CloudStream
         size_t m_msgsSentCurrentRun {0U};
         const std::string m_nodeName;
         PumpController& m_pumpController;
+        bool m_brewTimerPauseLast {true};
 };
 
 

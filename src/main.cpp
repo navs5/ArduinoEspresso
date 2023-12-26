@@ -13,6 +13,8 @@ EspressoMachine machine1;
 WebServer server(80);
 
 
+#define DEBUG_MODE 0
+
 void setup()
 {
     // Set all pins to default values
@@ -21,10 +23,10 @@ void setup()
     ledcWrite(EspressoConfig::pwmChannel_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);  // Default pwm to high
 
     delay(10);
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println();
     Serial.print("Connecting to ");
-    Serial.println(NodeCredentials::wifi_ssid);
+    Serial.print(NodeCredentials::wifi_ssid);
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(NodeCredentials::wifi_ssid, NodeCredentials::wifi_pwd);
@@ -52,7 +54,7 @@ void setup()
 
     Serial.println("");
     Serial.println("WiFi connected");
-    Serial.println("IP address: ");
+    Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
     /*return index page which is stored in serverIndex */
@@ -102,7 +104,7 @@ void loop()
     unsigned long now = micros();
     if ( now - before >= 10000U )
     {
-        machine1.runMachine100Hz();
         before = now;
+        machine1.runMachine100Hz();
     }
 }

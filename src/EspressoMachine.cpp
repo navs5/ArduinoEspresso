@@ -4,9 +4,7 @@ EspressoMachineNs::MachineCmdVals_S machineCmdVals {};
 
 void EspressoMachine::begin()
 {
-    // Enable prefusion by default
-    machineCmdVals.prefusionEnable = true;
-    // Brew timer should not be paused by default
+    // Brew timer should be paused by default
     machineCmdVals.brewTimerPause = true;
 
     m_cloudStream1.begin();

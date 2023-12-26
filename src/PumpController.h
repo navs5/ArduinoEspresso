@@ -11,9 +11,9 @@
 #define PREFUSION_END_QUAL_COUNT       (3U)             // Prefusion will end after this many consecutive counts of required weight
 #define TARGET_WEIGHT_QUAL_TIME_MS     (300)            // Post target weight time after weight is reached for this amount of time
 #define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))  // Max amount of time to run brew timer
-#define INIT_PUMP_FULL_POWER_TIME_MS   (S_TO_MS(30U))   // Amount of time to run pump at full power out of power up
+#define INIT_PUMP_FULL_POWER_TIME_MS   (S_TO_MS(15U))   // Amount of time to run pump at full power out of power up
 #define PUMP_PREFUSION_TO_BREW_TIME_MS (S_TO_MS(3U))    // Time it takes to transition pump power from prefusion level to brew level
-#define PUMP_BREW_TO_PREFUSION_TIME_MS (S_TO_MS(2U))    // Time it takes to transition pump power from brew level to prefusion level
+#define PUMP_BREW_TO_PREFUSION_TIME_MS (500U)           // Time it takes to transition pump power from brew level to prefusion level
 
 struct AlertPayload
 {
@@ -44,11 +44,15 @@ class Controller
             if ( m_alertsQueue.size() < m_maxAlerts )
             {
                 m_alertsQueue.push(newAlert);
+#if (DEBUG_MODE == 1U)
                 printf("added alert, size of queue now: %d\n", m_alertsQueue.size());
+#endif
             }
             else
             {
-                printf("Alert queue filled up!\n");
+#if (DEBUG_MODE == 1U)
+               printf("Alert queue filled up!\n");
+#endif
             }
         }
 
@@ -61,12 +65,15 @@ class Controller
                 alertPresent = true;
                 retrievedAlert = m_alertsQueue.front();
                 m_alertsQueue.pop();
-
+#if (DEBUG_MODE == 1U)
                 printf("Getting alert, size of queue now: %d, is empty: %d\n", m_alertsQueue.size(), m_alertsQueue.empty());
+#endif
             }
             else
             {
+#if (DEBUG_MODE == 1U)
                 printf("Already empty\n\n");
+#endif
             }
 
             return alertPresent;
