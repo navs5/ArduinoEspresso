@@ -6,7 +6,7 @@
 #define GRAMS_TO_MILLIGRAMS(x)  ((x) * 1000.0F)
 #define GRAMS_TO_DECIGRAMS(x)   ((x) * 100.0F)
 #define BAR_TO_DECIBAR(x)       ((x) * 100.0F)
-#define C_TO_DECIBAR(x)         ((x) * 100.0F)
+#define C_TO_CENTI_C(x)         ((x) * 100.0F)
 
 #define WITHIN(A, MIN, MAX)       ((A >= MIN) && (A <= MAX))
 #define CHARS_TO_DIGITS_FAIL_VAL  (UINT32_MAX)
@@ -311,16 +311,17 @@ void CloudStream::postPeriodicMessages()
 
 void CloudStream::packageSensorData(JsonDocument& jsonDoc)
 {
-    jsonDoc["w"] = lroundf(GRAMS_TO_MILLIGRAMS(m_pumpController.getWeight()));
-    jsonDoc["p"] = lroundf(456.5F);
-    jsonDoc["tm"] = "323";
-    jsonDoc["ti"] = lroundf(MS_TO_DS(m_pumpController.brewTimerGetCount()));
+    jsonDoc["w"]     = lroundf(GRAMS_TO_MILLIGRAMS(m_pumpController.getWeight()));
+    jsonDoc["tTank"] = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTank()));
+    jsonDoc["tOut"]  = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTankOutlet()));
+    jsonDoc["tRtn"]  = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTankReturn()));
+    jsonDoc["ti"]    = lroundf(MS_TO_DS(m_pumpController.brewTimerGetCount()));
 }
 
 void CloudStream::packageInfoData(JsonDocument& jsonDoc)
 {
     jsonDoc["tw"] = lroundf(GRAMS_TO_DECIGRAMS(machineCmdVals.targetWeight_g));
     jsonDoc["tp"] = lround((BAR_TO_DECIBAR(machineCmdVals.targetPressure_bar)));
-    jsonDoc["tt"] = lround((C_TO_DECIBAR(machineCmdVals.targetTemperature_C)));
+    jsonDoc["tt"] = lround((C_TO_CENTI_C(machineCmdVals.targetTemperature_C)));
     jsonDoc["pf"] = (machineCmdVals.prefusionEnable ? 1U : 0U);
 }

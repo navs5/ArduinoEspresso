@@ -1,4 +1,5 @@
 #include "PumpController.h"
+#include "filter.h"
 #include <ArduinoJson.h>
 
 
@@ -11,6 +12,16 @@
 #define LOADCELL2_SCK_PIN    5
 
 #define PREFUSION_END_WEIGHT_G 3U  // Weight at which prefusion will turn off
+
+#define THERMISTOR_VOLTAGE_DIV_RESISTOR_OHM (10000.0F) // Bottom resistor on the voltage divider circuit
+
+#define ADC_REF_V (3.3F)
+#define ADC_TICS_TO_V(x)  ((ADC_REF_V/4095.0F)*(x) + 0.17F)
+
+#define VOLTAGE_DIV_REF_V (3.3F)
+#define ADC_TICS_TO_THERM_RES_OHM(x) ((VOLTAGE_DIV_REF_V/ADC_TICS_TO_V(x) - 1.0F) * THERMISTOR_VOLTAGE_DIV_RESISTOR_OHM)
+
+#define THERM_FILTER_GAIN  LFP_GAIN_FROM_FC(0.1F, 100.0F)  // 0.1Hz cutoff gain for 1st order low pass filter with sampling at 100Hz
 
 
 float calculateRateChange(float startValue, float endValue, float timeLength)
@@ -39,7 +50,9 @@ void PumpController::beginController()
     m_scale2.begin(LOADCELL2_DOUT_PIN, LOADCELL2_SCK_PIN, 128U);
     m_scale1.set_scale(calibration1_factor);
     m_scale2.set_scale(calibration2_factor);
+    printf("Taring scale 1\n");
     m_scale1.tare(20U);	//Reset the scale to 0
+    printf("Taring scale 2\n");
     m_scale2.tare(20U);	//Reset the scale to 0
 
     m_brewTimer.pause();
@@ -74,7 +87,21 @@ void PumpController::readInputs()
 
     m_weight_g = m_weight1_g + m_weight2_g;
 
+    float tankThermRes_Ohm       = ADC_TICS_TO_THERM_RES_OHM(analogRead(EspressoConfig::pin_thermistor_tank));
+    float tankOutletThermRes_Ohm = ADC_TICS_TO_THERM_RES_OHM(analogRead(EspressoConfig::pin_thermistor_tankOutlet));
+    float tankReturnThermRes_Ohm = ADC_TICS_TO_THERM_RES_OHM(analogRead(EspressoConfig::pin_thermistor_tankInlet));
+
+    float tankTempRaw_C = thermistorLut.Lookup(tankThermRes_Ohm);
+    float tankOutletTempRaw_C = thermistorLut.Lookup(tankOutletThermRes_Ohm);
+    float tankReturnTempRaw_C = thermistorLut.Lookup(tankReturnThermRes_Ohm);
+
+    m_tankTemp_C       = LPF_RUN(m_tankTemp_C, tankTempRaw_C, THERM_FILTER_GAIN);
+    m_tankOutletTemp_C = LPF_RUN(m_tankOutletTemp_C, tankOutletTempRaw_C, THERM_FILTER_GAIN);
+    m_tankReturnTemp_C = LPF_RUN(m_tankReturnTemp_C, tankReturnTempRaw_C, THERM_FILTER_GAIN);
+
 #if (DEBUG_MODE == 1U)
+    printf("%f V -> %f kOhms -> %f C -> %f C\n", ADC_TICS_TO_V(analogRead(EspressoConfig::pin_thermistor_tank)), tankThermRes_Ohm / 1000.0F, tankTempRaw_C, m_tankTemp_C);
+
     // Print each weight scale along with brew timer
     static int32_t printCount = 0U;
     if (printCount % 50 == 0)
@@ -84,7 +111,6 @@ void PumpController::readInputs()
     }
     printCount++;
 #endif
-
 }
 
 void PumpController::processCommandRequests()

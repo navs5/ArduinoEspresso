@@ -4,6 +4,8 @@
 #include "HX711.h"
 #include "SwTimer.h"
 #include "EspressoMachine_types.h"
+#include "lookupTable.hpp"
+#include "thermistorTables.h"
 #include "Config.h"
 #include <queue>
 
@@ -100,6 +102,21 @@ class PumpController final : public Controller
             return (m_weight_g);
         }
 
+        float getTemperatureTank() const
+        {
+            return m_tankTemp_C;
+        }
+
+        float getTemperatureTankOutlet() const
+        {
+            return m_tankOutletTemp_C;
+        }
+
+        float getTemperatureTankReturn() const
+        {
+            return m_tankReturnTemp_C;
+        }
+
         void setTareRequest()
         {
             m_tareRequested = true;
@@ -133,6 +150,7 @@ class PumpController final : public Controller
         void processAlerts();
 
         EspressoMachineNs::MachineCmdVals_S& m_machineCmdVals;
+        Table1D thermistorLut {&thermTable_ntc3950_100K[0], sizeof(thermTable_ntc3950_100K)/sizeof(thermTable_ntc3950_100K[0])};
         static constexpr uint32_t m_kMaxTareCount {10U};  // Number of values to average for taring
         SwUpTimer m_brewTimer {BREW_TIMER_MAX_LEN_MS, PUMP_MODULE_PERIOD_MS};
         SwDownTimer m_targetWeightQualTimer {TARGET_WEIGHT_QUAL_TIME_MS, PUMP_MODULE_PERIOD_MS};
@@ -152,6 +170,9 @@ class PumpController final : public Controller
         PumpCtlrState m_pumpState {PumpCtlrState::INIT};
         HX711 m_scale1 {};
         HX711 m_scale2 {};
+        float m_tankTemp_C {25.0F};
+        float m_tankOutletTemp_C {25.0F};
+        float m_tankReturnTemp_C {25.0F};
 };
 
 
