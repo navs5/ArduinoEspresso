@@ -14,8 +14,9 @@
 #define TARGET_WEIGHT_QUAL_TIME_MS     (300)            // Post target weight time after weight is reached for this amount of time
 #define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))  // Max amount of time to run brew timer
 #define INIT_PUMP_FULL_POWER_TIME_MS   (S_TO_MS(15U))   // Amount of time to run pump at full power out of power up
-#define PUMP_PREFUSION_TO_BREW_TIME_MS (S_TO_MS(3U))    // Time it takes to transition pump power from prefusion level to brew level
+#define PUMP_PREFUSION_TO_BREW_TIME_MS (500U)           // Time it takes to transition pump power from prefusion level to brew level
 #define PUMP_BREW_TO_PREFUSION_TIME_MS (500U)           // Time it takes to transition pump power from brew level to prefusion level
+#define PUMP_DUTY_UPDATE_PERIOD_MS     (1000U)          // Time it takes to update pump pwm to new value
 
 struct AlertPayload
 {
@@ -112,6 +113,11 @@ class PumpController final : public Controller
             return m_tankOutletTemp_C;
         }
 
+        float getPumpDuty() const
+        {
+            return ((m_pumpPwm / (float)EspressoConfig::maxDuty_pumpCtlr) * 100.0F);
+        }
+
         float getTemperatureTankReturn() const
         {
             return m_tankReturnTemp_C;
@@ -163,6 +169,7 @@ class PumpController final : public Controller
         float m_offsetWeight1_g {0.0F};
         float m_offsetWeight2_g {0.0F};
         float m_pumpPwm {EspressoConfig::maxDuty_pumpCtlr};
+        float m_pumpPwmTarget {EspressoConfig::maxDuty_pumpCtlr};
         uint32_t m_tareCount {0U};
         bool m_tareRequested {false};
         bool m_targetWeightAlertSet {false};

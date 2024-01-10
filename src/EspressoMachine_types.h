@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-namespace EspressoMachineNs 
+namespace EspressoMachineNs
 {
 
 struct MachineCmdVals_S
@@ -13,9 +13,11 @@ struct MachineCmdVals_S
     bool brewTimerReset;
     bool configUpdated;
     bool prefusionEnable;
+    bool pumpDutyUpdated;
     float targetPressure_bar;
     float targetTemperature_C;
     float targetWeight_g;
+    float pumpDuty;
 };
 
 }  // namespace EspressoMachine

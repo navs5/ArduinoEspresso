@@ -148,6 +148,15 @@ void PumpController::processCommandRequests()
         AlertPayload clearAlert = {.alertName="targetWeightReached", .alertPayload=serializedData};
         addAlert(clearAlert);
     }
+
+    if ( m_machineCmdVals.pumpDutyUpdated )
+    {
+        m_pumpPwmTarget = ((m_machineCmdVals.pumpDuty / 100.0F) * EspressoConfig::maxDuty_pumpCtlr);
+        m_pumpRateChange = calculateRateChange(m_pumpPwm, m_pumpPwmTarget, PUMP_DUTY_UPDATE_PERIOD_MS);
+        const float absSaturatedRateChange = saturate(std::abs(m_pumpRateChange), 0.02F, 0.2F);
+        m_pumpRateChange = m_pumpRateChange > 0.0F ? absSaturatedRateChange : (-1.0F * absSaturatedRateChange);
+        m_machineCmdVals.pumpDutyUpdated = false;
+    }
 }
 
 void PumpController::processController()
@@ -165,12 +174,14 @@ void PumpController::processController()
             {
                 if (m_machineCmdVals.prefusionEnable)
                 {
-                    m_pumpRateChange = calculateRateChange(EspressoConfig::maxDuty_pumpCtlr, EspressoConfig::prefusionDuty_pumpCtlr, PUMP_BREW_TO_PREFUSION_TIME_MS);
+                    m_pumpPwmTarget = EspressoConfig::prefusionDuty_pumpCtlr;
+                    m_pumpRateChange = calculateRateChange(m_pumpPwm, m_pumpPwmTarget, PUMP_BREW_TO_PREFUSION_TIME_MS);
                     m_pumpState = PumpCtlrState::PREFUSION;
                 }
                 else
                 {
                     // No rate change required. Going from full power to full power
+                    m_pumpPwmTarget = EspressoConfig::maxDuty_pumpCtlr;
                     m_pumpRateChange = 0.0F;
                     m_pumpState = PumpCtlrState::BREW;
                 }
@@ -182,42 +193,44 @@ void PumpController::processController()
 
         case PumpCtlrState::PREFUSION:
         {
-            m_pumpPwm = rateLimit(m_pumpPwm, EspressoConfig::prefusionDuty_pumpCtlr,  m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
+            m_pumpPwm = rateLimit(m_pumpPwm, m_pumpPwmTarget,  m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
 
             // Exit: If prefusion manually turned off
             if ( !m_machineCmdVals.prefusionEnable )
             {
-                m_pumpRateChange = calculateRateChange(EspressoConfig::prefusionDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr, PUMP_PREFUSION_TO_BREW_TIME_MS);
+                m_pumpPwmTarget = EspressoConfig::maxDuty_pumpCtlr;
+                m_pumpRateChange = calculateRateChange(m_pumpPwm, m_pumpPwmTarget, PUMP_PREFUSION_TO_BREW_TIME_MS);
                 m_pumpState = PumpCtlrState::BREW;
             }
 
             // Exit: If weight target reached
-            if (m_weight_g > PREFUSION_END_WEIGHT_G)
-            {
-                m_prefusionEndQualCount++;
-                if (m_prefusionEndQualCount >= PREFUSION_END_QUAL_COUNT)
-                {
-                    m_prefusionEndQualCount = 0U;
-                    m_pumpRateChange = calculateRateChange(EspressoConfig::prefusionDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr, PUMP_PREFUSION_TO_BREW_TIME_MS);
-                    m_pumpState = PumpCtlrState::BREW;
-                }
-            }
-            else
-            {
-                m_prefusionEndQualCount = 0U;
-            }
+            // if (m_weight_g > PREFUSION_END_WEIGHT_G)
+            // {
+            //     m_prefusionEndQualCount++;
+            //     if (m_prefusionEndQualCount >= PREFUSION_END_QUAL_COUNT)
+            //     {
+            //         m_prefusionEndQualCount = 0U;
+            //         m_pumpRateChange = calculateRateChange(EspressoConfig::prefusionDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr, PUMP_PREFUSION_TO_BREW_TIME_MS);
+            //         m_pumpState = PumpCtlrState::BREW;
+            //     }
+            // }
+            // else
+            // {
+            //     m_prefusionEndQualCount = 0U;
+            // }
 
             break;
         }
 
         case PumpCtlrState::BREW:
         {
-            m_pumpPwm = rateLimit(m_pumpPwm, EspressoConfig::maxDuty_pumpCtlr, m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
+            m_pumpPwm = rateLimit(m_pumpPwm, m_pumpPwmTarget, m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
 
             // Exit: Transition back to prefusion on rising edge
             if (!m_prevPrefusionCmd && m_machineCmdVals.prefusionEnable)
             {
-                m_pumpRateChange = calculateRateChange(EspressoConfig::maxDuty_pumpCtlr, EspressoConfig::prefusionDuty_pumpCtlr, PUMP_BREW_TO_PREFUSION_TIME_MS);
+                m_pumpPwmTarget = EspressoConfig::prefusionDuty_pumpCtlr;
+                m_pumpRateChange = calculateRateChange(m_pumpPwm, m_pumpPwmTarget, PUMP_BREW_TO_PREFUSION_TIME_MS);
                 m_pumpState = PumpCtlrState::PREFUSION;
             }
 

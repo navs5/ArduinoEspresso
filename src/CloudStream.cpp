@@ -22,7 +22,8 @@ enum MachineTarget_E
 {
     WEIGHT = 0,
     PRESSURE = 1,
-    TEMPERATURE
+    TEMPERATURE = 2,
+    PUMP_DUTY = 3
 };
 
 
@@ -130,6 +131,12 @@ void updateTargets(MachineTarget_E targetType, const uint8_t* const payload, uns
 
     switch (targetType)
     {
+        case MachineTarget_E::PUMP_DUTY:
+        {
+            machineCmdVals.pumpDuty = payloadVal;
+            machineCmdVals.pumpDutyUpdated = true;
+            break;
+        }
         case MachineTarget_E::WEIGHT:
         {
             machineCmdVals.targetWeight_g = payloadVal;
@@ -172,6 +179,10 @@ void commandsCallback(char* p_topic, uint8_t* p_message, unsigned int length)
     if ( strstr(p_specificTopic, "general") != nullptr )
     {
         processCmdPayload(p_message, length);
+    }
+    else if( strstr(p_specificTopic, "setPumpDuty") != nullptr)
+    {
+        updateTargets(MachineTarget_E::PUMP_DUTY, p_message, length);
     }
     else if( strstr(p_specificTopic, "setTargetWeight_g") != nullptr)
     {
@@ -234,6 +245,7 @@ void CloudStream::reconnect() {
             Serial.println("connected");
             // Subscribe
             m_client.subscribe("espresso1/cmd/general");  // TODO: Grab topic names from config
+            m_client.subscribe("espresso1/cmd/setPumpDuty");
             m_client.subscribe("espresso1/cmd/setTargetWeight_g");
             m_client.subscribe("espresso1/cmd/setPress_bar");
             m_client.subscribe("espresso1/cmd/setTemp_C");
@@ -316,6 +328,7 @@ void CloudStream::packageSensorData(JsonDocument& jsonDoc)
     jsonDoc["tOut"]  = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTankOutlet()));
     jsonDoc["tRtn"]  = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTankReturn()));
     jsonDoc["ti"]    = lroundf(MS_TO_DS(m_pumpController.brewTimerGetCount()));
+    jsonDoc["pd"]    = lroundf(m_pumpController.getPumpDuty());
 }
 
 void CloudStream::packageInfoData(JsonDocument& jsonDoc)
