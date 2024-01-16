@@ -16,13 +16,16 @@
 #define THERMISTOR_VOLTAGE_DIV_RESISTOR_OHM (10000.0F) // Bottom resistor on the voltage divider circuit
 
 #define ADC_REF_V (3.3F)
-#define ADC_TICS_TO_V(x)  ((ADC_REF_V/4095.0F)*(x) + 0.17F)
+#define ADC_TICS_TO_V(x)  ((ADC_REF_V/4095.0F)*(x)) // + 0.17F)
 
 #define VOLTAGE_DIV_REF_V (3.3F)
 #define ADC_TICS_TO_THERM_RES_OHM(x) ((VOLTAGE_DIV_REF_V/ADC_TICS_TO_V(x) - 1.0F) * THERMISTOR_VOLTAGE_DIV_RESISTOR_OHM)
+#define ADC_TICS_TO_PUMP_CURR_A(x)  (ADC_TICS_TO_V(x) * 0.4F)
 
 #define THERM_FILTER_GAIN  LFP_GAIN_FROM_FC(0.1F, 100.0F)  // 0.1Hz cutoff gain for 1st order low pass filter with sampling at 100Hz
+#define PUMP_CURRENT_FILTER_GAIN  LFP_GAIN_FROM_FC(1.0F, 1000.0F)  // 1.0Hz cutoff gain for 1st order low pass filter with sampling at 1kHz
 
+#define PUMP_ON_CURRENT_THRESHOLD_A (0.35F)
 
 float calculateRateChange(float startValue, float endValue, float timeLength)
 {
@@ -59,6 +62,14 @@ void PumpController::beginController()
     m_pumpState = PumpCtlrState::INIT;
 }
 
+void PumpController::runController1khz()
+{
+    // Sample the pump current. Heavy filter added to sample out the 60Hz AC waveform
+    float currentSampleRaw_A = ADC_TICS_TO_PUMP_CURR_A(analogRead(EspressoConfig::pin_pumpCurrent));
+    m_pumpCurrent_A = LPF_RUN(m_pumpCurrent_A, currentSampleRaw_A * currentSampleRaw_A, PUMP_CURRENT_FILTER_GAIN);
+    m_pumpCurrentRms_A = sqrt(m_pumpCurrent_A);
+}
+
 void PumpController::runController()
 {
     readInputs();
@@ -66,6 +77,9 @@ void PumpController::runController()
     processController();
     writeOutputs();
     processAlerts();
+
+    m_pumpPrevOn = m_pumpOn;
+    m_prevBrewTimerCmd = m_machineCmdVals.brewTimerPause;
 }
 
 void PumpController::readInputs()
@@ -122,13 +136,16 @@ void PumpController::processCommandRequests()
         m_machineCmdVals.tareRequest = false;
     }
 
-    if ( m_machineCmdVals.brewTimerPause )
+    if (m_prevBrewTimerCmd != m_machineCmdVals.brewTimerPause)
     {
-        m_brewTimer.pause();
-    }
-    else
-    {
-        m_brewTimer.resume();
+        if ( m_machineCmdVals.brewTimerPause )
+        {
+            m_brewTimer.pause();
+        }
+        else
+        {
+            m_brewTimer.resume();
+        }
     }
 
     if ( m_machineCmdVals.brewTimerReset )
@@ -153,7 +170,7 @@ void PumpController::processCommandRequests()
     {
         m_pumpPwmTarget = ((m_machineCmdVals.pumpDuty / 100.0F) * EspressoConfig::maxDuty_pumpCtlr);
         m_pumpRateChange = calculateRateChange(m_pumpPwm, m_pumpPwmTarget, PUMP_DUTY_UPDATE_PERIOD_MS);
-        const float absSaturatedRateChange = saturate(std::abs(m_pumpRateChange), 0.02F, 0.2F);
+        const float absSaturatedRateChange = saturate(std::abs(m_pumpRateChange), 0.04F, 0.3F);
         m_pumpRateChange = m_pumpRateChange > 0.0F ? absSaturatedRateChange : (-1.0F * absSaturatedRateChange);
         m_machineCmdVals.pumpDutyUpdated = false;
     }
@@ -195,6 +212,8 @@ void PumpController::processController()
         {
             m_pumpPwm = rateLimit(m_pumpPwm, m_pumpPwmTarget,  m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
 
+            autoRunBrewTimer();
+
             // Exit: If prefusion manually turned off
             if ( !m_machineCmdVals.prefusionEnable )
             {
@@ -225,6 +244,8 @@ void PumpController::processController()
         case PumpCtlrState::BREW:
         {
             m_pumpPwm = rateLimit(m_pumpPwm, m_pumpPwmTarget, m_pumpRateChange, PUMP_MODULE_PERIOD_MS, EspressoConfig::offDuty_pumpCtlr, EspressoConfig::maxDuty_pumpCtlr);
+
+            autoRunBrewTimer();
 
             // Exit: Transition back to prefusion on rising edge
             if (!m_prevPrefusionCmd && m_machineCmdVals.prefusionEnable)
@@ -274,5 +295,37 @@ void PumpController::processAlerts()
     else
     {
         m_targetWeightQualTimer.reset();
+    }
+}
+
+
+void PumpController::autoRunBrewTimer(void)
+{
+    if (m_pumpCurrentRms_A > PUMP_ON_CURRENT_THRESHOLD_A)
+    {
+        if (m_pumpOnQualTimer.updateAndCheckTimer())
+        {
+            m_pumpOn = true;
+        }
+    }
+    else
+    {
+        m_pumpOn = false;
+        m_pumpOnQualTimer.reset();
+    }
+
+    // Automatically start brew timer on rising edge
+    // and when weight scale is cleared
+    if (!m_pumpPrevOn && m_pumpOn && (abs(m_weight_g) < PREFUSION_END_WEIGHT_G))
+    {
+        m_brewTimer.resume();
+        m_machineCmdVals.brewTimerPause = false;  // sync the cmd value as well
+    }
+
+    // Automatically pause brew timer on falling edge
+    if (m_pumpPrevOn && !m_pumpOn)
+    {
+        m_brewTimer.pause();
+        m_machineCmdVals.brewTimerPause = true;  // sync the cmd value as well
     }
 }

@@ -14,6 +14,8 @@ namespace EspressoConfig
     constexpr uint8_t pin_thermistor_tankOutlet = 35U; // ADC 1_7
     constexpr uint8_t pin_thermistor_tankInlet = 33U; // ADC 1_5
 
+    constexpr uint8_t pin_pumpCurrent = 32U; // ADC_1_4
+
     constexpr uint16_t maxDuty_pumpCtlr = ((1U << pwmResolution_pumpCtlr) - 1U);
     constexpr uint16_t prefusionDuty_pumpCtlr = (0.3F * maxDuty_pumpCtlr);
     constexpr uint16_t offDuty_pumpCtlr = (0U);

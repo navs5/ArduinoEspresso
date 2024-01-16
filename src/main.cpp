@@ -99,12 +99,21 @@ void loop()
 {
     server.handleClient();
 
-    // call loop at 100hz
-    static unsigned long before = micros();
-    unsigned long now = micros();
-    if ( now - before >= 10000U )
+    // call loop at 1khz
+    static unsigned long before1khz = micros();
+    unsigned long now1khz = micros();
+    if ( now1khz - before1khz >= 1000U )
     {
-        before = now;
+        before1khz = now1khz;
+        machine1.runMachine1kHz();
+    }
+
+    // call loop at 100hz
+    static unsigned long before100hz = micros();
+    unsigned long now100hz = micros();
+    if ( now100hz - before100hz >= 10000U )
+    {
+        before100hz = now100hz;
         machine1.runMachine100Hz();
     }
 }

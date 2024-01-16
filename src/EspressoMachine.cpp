@@ -11,6 +11,12 @@ void EspressoMachine::begin()
     m_pumpController1.beginController();
 }
 
+void EspressoMachine::runMachine1kHz()
+{
+    // Run pump controller for regulated pressure and weight
+    m_pumpController1.runController1khz();
+}
+
 void EspressoMachine::runMachine100Hz()
 {
     // Run pump controller for regulated pressure and weight

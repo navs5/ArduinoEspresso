@@ -12,6 +12,7 @@
 #define PUMP_MODULE_PERIOD_MS          (10U)            // Period of pump module
 #define PREFUSION_END_QUAL_COUNT       (3U)             // Prefusion will end after this many consecutive counts of required weight
 #define TARGET_WEIGHT_QUAL_TIME_MS     (300)            // Post target weight time after weight is reached for this amount of time
+#define PUMP_ON_QUAL_TIME_MS           (500U)           // Pump will be considered on after current is above threshold for this duration
 #define BREW_TIMER_MAX_LEN_MS          (MIN_TO_MS(5U))  // Max amount of time to run brew timer
 #define INIT_PUMP_FULL_POWER_TIME_MS   (S_TO_MS(15U))   // Amount of time to run pump at full power out of power up
 #define PUMP_PREFUSION_TO_BREW_TIME_MS (500U)           // Time it takes to transition pump power from prefusion level to brew level
@@ -96,6 +97,7 @@ class PumpController final : public Controller
         ~PumpController() {}
 
         void beginController();
+        void runController1khz();
         void runController();
 
         float getWeight() const
@@ -121,6 +123,11 @@ class PumpController final : public Controller
         float getTemperatureTankReturn() const
         {
             return m_tankReturnTemp_C;
+        }
+
+        float getPumpCurrent() const
+        {
+            return m_pumpCurrentRms_A;
         }
 
         void setTareRequest()
@@ -154,12 +161,14 @@ class PumpController final : public Controller
         void processController();
         void writeOutputs();
         void processAlerts();
+        void autoRunBrewTimer();
 
         EspressoMachineNs::MachineCmdVals_S& m_machineCmdVals;
         Table1D thermistorLut {&thermTable_ntc3950_100K[0], sizeof(thermTable_ntc3950_100K)/sizeof(thermTable_ntc3950_100K[0])};
         static constexpr uint32_t m_kMaxTareCount {10U};  // Number of values to average for taring
         SwUpTimer m_brewTimer {BREW_TIMER_MAX_LEN_MS, PUMP_MODULE_PERIOD_MS};
         SwDownTimer m_targetWeightQualTimer {TARGET_WEIGHT_QUAL_TIME_MS, PUMP_MODULE_PERIOD_MS};
+        SwDownTimer m_pumpOnQualTimer {PUMP_ON_QUAL_TIME_MS, PUMP_MODULE_PERIOD_MS};
         SwDownTimer m_initFullPowerTimer {INIT_PUMP_FULL_POWER_TIME_MS, PUMP_MODULE_PERIOD_MS};
         uint32_t m_prefusionEndQualCount {0U};
         float m_pumpRateChange {0.0F};
@@ -180,6 +189,11 @@ class PumpController final : public Controller
         float m_tankTemp_C {25.0F};
         float m_tankOutletTemp_C {25.0F};
         float m_tankReturnTemp_C {25.0F};
+        float m_pumpCurrent_A {0.0F};
+        float m_pumpCurrentRms_A {0.0F};
+        bool m_pumpOn {false};
+        bool m_pumpPrevOn {false};
+        bool m_prevBrewTimerCmd {false};
 };
 
 

@@ -7,6 +7,7 @@
 #define GRAMS_TO_DECIGRAMS(x)   ((x) * 100.0F)
 #define BAR_TO_DECIBAR(x)       ((x) * 100.0F)
 #define C_TO_CENTI_C(x)         ((x) * 100.0F)
+#define A_TO_MA(x)              ((x) * 1000.0F)
 
 #define WITHIN(A, MIN, MAX)       ((A >= MIN) && (A <= MAX))
 #define CHARS_TO_DIGITS_FAIL_VAL  (UINT32_MAX)
@@ -329,6 +330,7 @@ void CloudStream::packageSensorData(JsonDocument& jsonDoc)
     jsonDoc["tRtn"]  = lroundf(C_TO_CENTI_C(m_pumpController.getTemperatureTankReturn()));
     jsonDoc["ti"]    = lroundf(MS_TO_DS(m_pumpController.brewTimerGetCount()));
     jsonDoc["pd"]    = lroundf(m_pumpController.getPumpDuty());
+    jsonDoc["pc"]    = lroundf(A_TO_MA(m_pumpController.getPumpCurrent()));
 }
 
 void CloudStream::packageInfoData(JsonDocument& jsonDoc)

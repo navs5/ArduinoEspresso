@@ -14,6 +14,7 @@ class EspressoMachine
         ~EspressoMachine() {}
 
         void begin();
+        void runMachine1kHz();
         void runMachine100Hz();
 
     private:
